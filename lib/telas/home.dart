@@ -20,12 +20,20 @@ class _TelaPrincipalState extends State<TelaPrincipal> {
   int? jogoId;
   String proximoJogoLocal = '';
   String proximoJogoData = '';
-  String proximoJogoHorario = '';
   int numeroJogo = 0;
-  int confirmados = 0;
+  int confirmadosJogo = 0;
+  bool usuarioConfirmadoJogo = false;
+  
+  // Dados do próximo evento
+  int? eventoId;
+  String eventoDescricao = '';
+  String eventoData = '';
+  double eventoValor = 0;
+  int confirmadosEvento = 0;
+  bool usuarioConfirmadoEvento = false;
+  bool temEvento = false;
   
   // Estado
-  bool usuarioConfirmado = false;
   bool carregando = true;
 
   @override
@@ -58,22 +66,64 @@ class _TelaPrincipalState extends State<TelaPrincipal> {
           .gte('data', hoje)
           .order('data', ascending: true)
           .limit(1)
-          .single();
-
-      // 3. Conta quantos confirmados no jogo
-      final confirmadosData = await supabase
-          .from('jogos_users')
-          .select('id')
-          .eq('id_jogo', jogoData['id'])
-          .eq('confirmado', true);
-
-      // 4. Verifica se o usuário já confirmou
-      final minhaConfirmacao = await supabase
-          .from('jogos_users')
-          .select()
-          .eq('id_jogo', jogoData['id'])
-          .eq('id_jogador', userData['id'])
           .maybeSingle();
+
+      // 3. Busca o próximo evento (dataecent >= hoje)
+      final eventoData = await supabase
+          .from('eventos')
+          .select()
+          .gte('dataecent', hoje)
+          .order('dataecent', ascending: true)
+          .limit(1)
+          .maybeSingle();
+
+      // Variáveis temporárias
+      int confJogo = 0;
+      bool userConfJogo = false;
+      int confEvento = 0;
+      bool userConfEvento = false;
+
+      // 4. Se tem jogo, busca confirmados
+      if (jogoData != null) {
+        final confirmadosJogoData = await supabase
+            .from('jogos_users')
+            .select('id')
+            .eq('id_jogo', jogoData['id'])
+            .eq('confirmado', true);
+
+        confJogo = confirmadosJogoData.length;
+
+        // Verifica se o usuário já confirmou no jogo
+        final minhaConfirmacaoJogo = await supabase
+            .from('jogos_users')
+            .select()
+            .eq('id_jogo', jogoData['id'])
+            .eq('id_jogador', userData['id'])
+            .maybeSingle();
+
+        userConfJogo = minhaConfirmacaoJogo != null && minhaConfirmacaoJogo['confirmado'] == true;
+      }
+
+      // 5. Se tem evento, busca confirmados
+      if (eventoData != null) {
+        final confirmadosEventoData = await supabase
+            .from('eventos_users')
+            .select('id')
+            .eq('idevent', eventoData['id'])
+            .eq('pago', true);
+
+        confEvento = confirmadosEventoData.length;
+
+        // Verifica se o usuário já confirmou no evento
+        final minhaConfirmacaoEvento = await supabase
+            .from('eventos_users')
+            .select()
+            .eq('idevent', eventoData['id'])
+            .eq('idjogador', userData['id'])
+            .maybeSingle();
+
+        userConfEvento = minhaConfirmacaoEvento != null;
+      }
 
       setState(() {
         // Usuário
@@ -81,22 +131,35 @@ class _TelaPrincipalState extends State<TelaPrincipal> {
         usuarioId = userData['id'];
         
         // Jogo
-        jogoId = jogoData['id'];
-        proximoJogoLocal = jogoData['local'] ?? '';
-        proximoJogoHorario = jogoData['horariojogo'] ?? '';
-        numeroJogo = jogoData['id'];
-        
-        // Formata a data
-        if (jogoData['data'] != null) {
-          final data = DateTime.parse(jogoData['data']);
-          proximoJogoData = '${data.day.toString().padLeft(2, '0')}/${data.month.toString().padLeft(2, '0')}/${data.year}';
+        if (jogoData != null) {
+          jogoId = jogoData['id'];
+          proximoJogoLocal = jogoData['local'] ?? '';
+          numeroJogo = jogoData['id'];
+          
+          if (jogoData['data'] != null) {
+            final data = DateTime.parse(jogoData['data']);
+            proximoJogoData = '${data.day.toString().padLeft(2, '0')}/${data.month.toString().padLeft(2, '0')}/${data.year}';
+          }
+          
+          confirmadosJogo = confJogo;
+          usuarioConfirmadoJogo = userConfJogo;
         }
         
-        // Confirmados
-        confirmados = confirmadosData.length;
-        
-        // Minha confirmação
-        usuarioConfirmado = minhaConfirmacao != null && minhaConfirmacao['confirmado'] == true;
+        // Evento
+        if (eventoData != null) {
+          temEvento = true;
+          eventoId = eventoData['id'];
+          eventoDescricao = eventoData['descricao'] ?? 'Evento';
+          eventoValor = (eventoData['valor'] ?? 0).toDouble();
+          
+          if (eventoData['dataecent'] != null) {
+            final data = DateTime.parse(eventoData['dataecent']);
+            this.eventoData = '${data.day.toString().padLeft(2, '0')}/${data.month.toString().padLeft(2, '0')}/${data.year}';
+          }
+          
+          confirmadosEvento = confEvento;
+          usuarioConfirmadoEvento = userConfEvento;
+        }
         
         carregando = false;
       });
@@ -108,12 +171,11 @@ class _TelaPrincipalState extends State<TelaPrincipal> {
     }
   }
 
-  void toggleConfirmacao() async {
+  void toggleConfirmacaoJogo() async {
     if (jogoId == null || usuarioId == null) return;
 
     try {
-      if (usuarioConfirmado) {
-        // Desconfirmar
+      if (usuarioConfirmadoJogo) {
         await supabase
             .from('jogos_users')
             .update({'confirmado': false})
@@ -121,11 +183,10 @@ class _TelaPrincipalState extends State<TelaPrincipal> {
             .eq('id_jogador', usuarioId!);
         
         setState(() {
-          usuarioConfirmado = false;
-          confirmados--;
+          usuarioConfirmadoJogo = false;
+          confirmadosJogo--;
         });
       } else {
-        // Confirmar - verifica se já existe registro
         final existe = await supabase
             .from('jogos_users')
             .select()
@@ -134,14 +195,12 @@ class _TelaPrincipalState extends State<TelaPrincipal> {
             .maybeSingle();
 
         if (existe != null) {
-          // Atualiza
           await supabase
               .from('jogos_users')
               .update({'confirmado': true})
               .eq('id_jogo', jogoId!)
               .eq('id_jogador', usuarioId!);
         } else {
-          // Insere novo
           await supabase.from('jogos_users').insert({
             'id_jogo': jogoId,
             'id_jogador': usuarioId,
@@ -150,9 +209,54 @@ class _TelaPrincipalState extends State<TelaPrincipal> {
         }
         
         setState(() {
-          usuarioConfirmado = true;
-          confirmados++;
+          usuarioConfirmadoJogo = true;
+          confirmadosJogo++;
         });
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erro: $e'), backgroundColor: AppColors.danger),
+      );
+    }
+  }
+
+  void toggleConfirmacaoEvento() async {
+    if (eventoId == null || usuarioId == null) return;
+
+    try {
+      if (usuarioConfirmadoEvento) {
+        // Remove confirmação do evento
+        await supabase
+            .from('eventos_users')
+            .delete()
+            .eq('idevent', eventoId!)
+            .eq('idjogador', usuarioId!);
+        
+        setState(() {
+          usuarioConfirmadoEvento = false;
+          confirmadosEvento--;
+        });
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Participação no evento cancelada'), backgroundColor: AppColors.danger),
+        );
+      } else {
+        // Confirma no evento
+        await supabase.from('eventos_users').insert({
+          'idevent': eventoId,
+          'idjogador': usuarioId,
+          'pago': false,
+          'valor': eventoValor,
+        });
+        
+        setState(() {
+          usuarioConfirmadoEvento = true;
+          confirmadosEvento++;
+        });
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Participação no evento confirmada!'), backgroundColor: AppColors.success),
+        );
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -207,9 +311,9 @@ class _TelaPrincipalState extends State<TelaPrincipal> {
                       onPressed: () {},
                       child: const Text('Ir para o APP', style: TextStyle(color: AppColors.textMuted)),
                     ),
-                    TextButton(
+                    IconButton(
                       onPressed: fazerLogout,
-                      child: const Text('LogOff', style: TextStyle(color: AppColors.textMuted)),
+                      icon: const Icon(Icons.logout, color: AppColors.textMuted),
                     ),
                   ],
                 ),
@@ -251,9 +355,9 @@ class _TelaPrincipalState extends State<TelaPrincipal> {
                       ),
                       const SizedBox(height: 32),
 
-                      // Próximo Jogo
+                      // ========== CARD DO JOGO ==========
                       const Text(
-                        'Proximo Jogo:',
+                        'Próximo Jogo:',
                         style: TextStyle(
                           fontSize: 16,
                           color: AppColors.textMuted,
@@ -261,7 +365,6 @@ class _TelaPrincipalState extends State<TelaPrincipal> {
                       ),
                       const SizedBox(height: 12),
 
-                      // Card do Jogo
                       Container(
                         margin: const EdgeInsets.symmetric(horizontal: 32),
                         padding: const EdgeInsets.all(16),
@@ -278,7 +381,6 @@ class _TelaPrincipalState extends State<TelaPrincipal> {
                         ),
                         child: Row(
                           children: [
-                            // Número do jogo
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                               decoration: BoxDecoration(
@@ -295,12 +397,8 @@ class _TelaPrincipalState extends State<TelaPrincipal> {
                               ),
                             ),
                             const SizedBox(width: 12),
-                            
-                            // Ícone bola
                             const Icon(Icons.sports_soccer, size: 40, color: Colors.black54),
                             const SizedBox(width: 12),
-
-                            // Info do jogo
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.end,
@@ -322,7 +420,7 @@ class _TelaPrincipalState extends State<TelaPrincipal> {
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    'Confirmados: $confirmados',
+                                    'Confirmados: $confirmadosJogo',
                                     style: const TextStyle(
                                       fontSize: 14,
                                       color: AppColors.success,
@@ -335,16 +433,16 @@ class _TelaPrincipalState extends State<TelaPrincipal> {
                           ],
                         ),
                       ),
-                      const SizedBox(height: 32),
+                      const SizedBox(height: 16),
 
-                      // Botão Confirmar/Não Vou
+                      // Botão Confirmar Jogo
                       SizedBox(
                         width: 200,
                         height: 50,
                         child: ElevatedButton(
-                          onPressed: toggleConfirmacao,
+                          onPressed: toggleConfirmacaoJogo,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: usuarioConfirmado ? AppColors.danger : AppColors.success,
+                            backgroundColor: usuarioConfirmadoJogo ? AppColors.danger : AppColors.success,
                             foregroundColor: Colors.white,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(25),
@@ -352,11 +450,125 @@ class _TelaPrincipalState extends State<TelaPrincipal> {
                             elevation: 4,
                           ),
                           child: Text(
-                            usuarioConfirmado ? 'Não Vou!' : 'Confirmar Presença',
+                            usuarioConfirmadoJogo ? 'Não Vou!' : 'Confirmar Presença',
                             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                           ),
                         ),
                       ),
+
+                      // ========== CARD DO EVENTO (se existir) ==========
+                      if (temEvento) ...[
+                        const SizedBox(height: 40),
+                        const Text(
+                          'Próximo Evento:',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: AppColors.textMuted,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+
+                        Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 32),
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.2),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: AppColors.accent,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Icon(
+                                  Icons.celebration,
+                                  color: Colors.white,
+                                  size: 24,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      eventoDescricao,
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.black87,
+                                      ),
+                                    ),
+                                    Text(
+                                      eventoData,
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.black54,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          'R\$ ${eventoValor.toStringAsFixed(2)}',
+                                          style: const TextStyle(
+                                            fontSize: 14,
+                                            color: AppColors.primary,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                        Text(
+                                          'Confirmados: $confirmadosEvento',
+                                          style: const TextStyle(
+                                            fontSize: 14,
+                                            color: AppColors.success,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Botão Confirmar Evento
+                        SizedBox(
+                          width: 220,
+                          height: 50,
+                          child: ElevatedButton(
+                            onPressed: toggleConfirmacaoEvento,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: usuarioConfirmadoEvento ? AppColors.danger : AppColors.accent,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(25),
+                              ),
+                              elevation: 4,
+                            ),
+                            child: Text(
+                              usuarioConfirmadoEvento ? 'Cancelar Evento' : 'Participar do Evento',
+                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ),
+                      ],
+
+                      const SizedBox(height: 40),
                     ],
                   ),
                 ),
