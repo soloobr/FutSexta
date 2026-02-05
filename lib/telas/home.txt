@@ -15,7 +15,6 @@ class _TelaPrincipalState extends State<TelaPrincipal> {
   // Dados do usuário
   String usuarioNome = '';
   int? usuarioId;
-  String usuarioModalidade = '';
   
   // Dados do próximo jogo
   int? jogoId;
@@ -24,8 +23,6 @@ class _TelaPrincipalState extends State<TelaPrincipal> {
   int numeroJogo = 0;
   int confirmadosJogo = 0;
   bool usuarioConfirmadoJogo = false;
-  DateTime? proximoJogoDateTime;
-
   
   // Dados do próximo evento
   int? eventoId;
@@ -38,13 +35,6 @@ class _TelaPrincipalState extends State<TelaPrincipal> {
   
   // Estado
   bool carregando = true;
-
-  bool podeInscreverAvulso(DateTime dataHoraJogo) {
-    final agora = DateTime.now();
-    final limite = dataHoraJogo.subtract(const Duration(days: 1));
-    return agora.isAfter(limite);
-  }
-
 
   @override
   void initState() {
@@ -64,7 +54,7 @@ class _TelaPrincipalState extends State<TelaPrincipal> {
       // 1. Busca dados do usuário pelo uid
       final userData = await supabase
           .from('users')
-          .select('id, display_name, modalidade')
+          .select('id, display_name')
           .eq('uid', uid)
           .single();
 
@@ -93,7 +83,6 @@ class _TelaPrincipalState extends State<TelaPrincipal> {
       int confEvento = 0;
       bool userConfEvento = false;
 
-
       // 4. Se tem jogo, busca confirmados
       if (jogoData != null) {
         final confirmadosJogoData = await supabase
@@ -102,7 +91,6 @@ class _TelaPrincipalState extends State<TelaPrincipal> {
             .eq('id_jogo', jogoData['id'])
             .eq('confirmado', true);
 
-        usuarioModalidade = userData['modalidade'] ?? '';
         confJogo = confirmadosJogoData.length;
 
         // Verifica se o usuário já confirmou no jogo
@@ -141,10 +129,6 @@ class _TelaPrincipalState extends State<TelaPrincipal> {
         // Usuário
         usuarioNome = userData['display_name'] ?? 'Usuário';
         usuarioId = userData['id'];
-        usuarioModalidade = userData['modalidade'] ?? '';
-
-        DateTime? proximoJogoDateTime;
-
         
         // Jogo
         if (jogoData != null) {
@@ -154,7 +138,6 @@ class _TelaPrincipalState extends State<TelaPrincipal> {
           
           if (jogoData['data'] != null) {
             final data = DateTime.parse(jogoData['data']);
-            proximoJogoDateTime = data; // guarda para cálculos
             proximoJogoData = '${data.day.toString().padLeft(2, '0')}/${data.month.toString().padLeft(2, '0')}/${data.year}';
           }
           
@@ -363,15 +346,7 @@ class _TelaPrincipalState extends State<TelaPrincipal> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        proximoJogoDateTime.toString(),
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textLight,
-                        ),
-                      ),
-                        Text(
-                        usuarioModalidade.toUpperCase(),
+                        usuarioNome.toUpperCase(),
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w600,
@@ -382,7 +357,7 @@ class _TelaPrincipalState extends State<TelaPrincipal> {
 
                       // ========== CARD DO JOGO ==========
                       const Text(
-                       'Próximo Jogo: ' ,
+                        'Próximo Jogo:',
                         style: TextStyle(
                           fontSize: 16,
                           color: AppColors.textMuted,
@@ -461,7 +436,7 @@ class _TelaPrincipalState extends State<TelaPrincipal> {
                       const SizedBox(height: 16),
 
                       // Botão Confirmar Jogo
-                      /*SizedBox(
+                      SizedBox(
                         width: 200,
                         height: 50,
                         child: ElevatedButton(
@@ -479,50 +454,8 @@ class _TelaPrincipalState extends State<TelaPrincipal> {
                             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                           ),
                         ),
-                      ),*/
+                      ),
 
-                    if (usuarioModalidade == "Mensalista" ||
-                        (usuarioModalidade == "Avulso" && proximoJogoDateTime != null && podeInscreverAvulso(proximoJogoDateTime!)))
-                    SizedBox(
-                        width: 200,
-                        height: 50,
-                        child: ElevatedButton(
-                        onPressed: toggleConfirmacaoJogo,
-                        style: ElevatedButton.styleFrom(
-                            backgroundColor: usuarioConfirmadoJogo ? AppColors.danger : AppColors.success,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
-                            elevation: 4,
-                        ),
-                        child: Text(
-                            usuarioConfirmadoJogo ? 'Não Vou!' : 'Confirmar Presença',
-                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                        ),
-                        ),
-                    )
-                    else if (usuarioModalidade == "Avulso"  && proximoJogoDateTime != null)
-                    Builder(
-                        builder: (context) {
-                            
-                        final limite = proximoJogoDateTime!.subtract(const Duration(days: 1));
-                        final aviso = "Avulso só pode colocar o nome na lista "
-                            "${limite.day.toString().padLeft(2, '0')}/"
-                            "${limite.month.toString().padLeft(2, '0')}/"
-                            "${limite.year} às "
-                            "${limite.hour.toString().padLeft(2, '0')}:"
-                            "${limite.minute.toString().padLeft(2, '0')}";
-
-                        return Text(
-                            aviso,
-                            style: const TextStyle(
-                            fontSize: 14,
-                            color: Colors.red,
-                            fontWeight: FontWeight.w600,
-                            ),
-                            textAlign: TextAlign.center,
-                        );
-                        },
-                    ),
                       // ========== CARD DO EVENTO (se existir) ==========
                       if (temEvento) ...[
                         const SizedBox(height: 40),
