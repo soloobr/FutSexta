@@ -1,13 +1,12 @@
 {
-    "name": "hello_world",
-    "short_name": "hello_world",
-    "start_url": ".",
+    "name": "FutSexta",
+    "short_name": "FutSexta",
+    "description": "Organize seu futebol de sexta",
+    "start_url": "/",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
-    "orientation": "portrait-primary",
-    "prefer_related_applications": false,
+    "background_color": "#0d1b2a",
+    "theme_color": "#1a237e",
+    "orientation": "portrait",
     "icons": [
         {
             "src": "icons/Icon-192.png",
