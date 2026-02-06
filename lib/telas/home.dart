@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../cores.dart';
 
+
+
 final supabase = Supabase.instance.client;
 
 class TelaPrincipal extends StatefulWidget {
@@ -143,7 +145,6 @@ class _TelaPrincipalState extends State<TelaPrincipal> {
         usuarioId = userData['id'];
         usuarioModalidade = userData['modalidade'] ?? '';
 
-        DateTime? proximoJogoDateTime;
 
         
         // Jogo
@@ -154,7 +155,8 @@ class _TelaPrincipalState extends State<TelaPrincipal> {
           
           if (jogoData['data'] != null) {
             final data = DateTime.parse(jogoData['data']);
-            proximoJogoDateTime = data; // guarda para cálculos
+            // guarda para cálculos
+            proximoJogoDateTime = data;
             proximoJogoData = '${data.day.toString().padLeft(2, '0')}/${data.month.toString().padLeft(2, '0')}/${data.year}';
           }
           
@@ -362,16 +364,9 @@ class _TelaPrincipalState extends State<TelaPrincipal> {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      Text(
-                        proximoJogoDateTime.toString(),
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textLight,
-                        ),
-                      ),
+
                         Text(
-                        usuarioModalidade.toUpperCase(),
+                        usuarioNome.toUpperCase(),
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w600,
@@ -480,9 +475,10 @@ class _TelaPrincipalState extends State<TelaPrincipal> {
                           ),
                         ),
                       ),*/
-
+                  
                     if (usuarioModalidade == "Mensalista" ||
                         (usuarioModalidade == "Avulso" && proximoJogoDateTime != null && podeInscreverAvulso(proximoJogoDateTime!)))
+
                     SizedBox(
                         width: 200,
                         height: 50,
@@ -500,10 +496,12 @@ class _TelaPrincipalState extends State<TelaPrincipal> {
                         ),
                         ),
                     )
-                    else if (usuarioModalidade == "Avulso"  && proximoJogoDateTime != null)
-                    Builder(
+                    else if (usuarioModalidade == "Avulso" && proximoJogoDateTime != null)
+                      Builder(
                         builder: (context) {
-                            
+                          print("APP_DEBUG usuarioModalidade: $usuarioModalidade");
+
+
                         final limite = proximoJogoDateTime!.subtract(const Duration(days: 1));
                         final aviso = "Avulso só pode colocar o nome na lista "
                             "${limite.day.toString().padLeft(2, '0')}/"
